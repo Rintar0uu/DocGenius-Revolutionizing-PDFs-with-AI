@@ -1,19 +1,17 @@
-from dotenv import load_dotenv
 import os
 import streamlit as st
+from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
+from langchain_groq import ChatGroq
 from langchain.chains.question_answering import load_qa_chain
-from langchain.llms import OpenAI
-from langchain.callbacks import get_openai_callback
 
 load_dotenv()
-from PIL import Image
-img = Image.open(r"C:\Users\KALYAN\Desktop\Projects\DocGenius\images.jpeg")
-st.set_page_config(page_title="DocGenius: Document Generation AI", page_icon= img)
-st.header("Ask Your PDF📄")
+
+st.title("Ask Your PDF (Groq-powered)")
+
 pdf = st.file_uploader("Upload your PDF", type="pdf")
 
 if pdf is not None:
@@ -27,20 +25,27 @@ if pdf is not None:
         chunk_size=1000,
         chunk_overlap=200,
         length_function=len
-    )  
+    )
 
     chunks = text_splitter.split_text(text)
 
-    embeddings = OpenAIEmbeddings()
+    # Replace OpenAI embeddings with HuggingFace embeddings
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     knowledge_base = FAISS.from_texts(chunks, embeddings)
 
     query = st.text_input("Ask your Question about your PDF")
+
     if query:
         docs = knowledge_base.similarity_search(query)
 
-        llm = OpenAI()
+        # Use Groq LLM instead of OpenAI
+        llm = ChatGroq(
+            groq_api_key=os.getenv("GROQ_API_KEY"),
+            model_name="llama-3.3-70b-versatile"
+        )
+
         chain = load_qa_chain(llm, chain_type="stuff")
         response = chain.run(input_documents=docs, question=query)
-           
+
         st.success(response)
-        
